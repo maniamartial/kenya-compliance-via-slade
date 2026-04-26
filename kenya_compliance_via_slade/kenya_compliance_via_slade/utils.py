@@ -1926,16 +1926,23 @@ def prepare_return_invoice_payload(
             )
     else:
         for item in invoice.items:
-            tax_amount = item.get(tax_field, 0) or 0
             qty = abs(item.get("qty"))
-            base_amount = round(abs(item.get(rate_field)) or 0, 4)
+            if not qty:
+                continue
+
+            # Use line gross amount directly for returns to avoid mixing unit-rate
+            # values with line-level tax totals.
+            line_gross_amount = abs(float(item.get("amount") or 0))
+            if not line_gross_amount:
+                unit_net_rate = abs(float(item.get(rate_field) or 0))
+                line_tax_amount = abs(float(item.get(tax_field) or 0))
+                line_gross_amount = (unit_net_rate * qty) + line_tax_amount
+
             items.append(
                 {
                     "item_name": item.item_code,
-                    "quantity": 1,
-                    "amount": round(base_amount - tax_amount, 4)
-                    * qty
-                    * convertion_rate,
+                    "quantity": round(qty, 2),
+                    "amount": round(line_gross_amount * convertion_rate, 4),
                 }
             )
 
